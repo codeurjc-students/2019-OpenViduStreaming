@@ -13,32 +13,6 @@ Visit [openvidu.io](https://openvidu.io)
 
 [OpenViduLogo]: https://secure.gravatar.com/avatar/5daba1d43042f2e4e85849733c8e5702?s=120
 
-## Contributors
+## Streaming
 
-This project exists thanks to all the people who contribute. 
-<a href="https://github.com/undefined/undefinedgraphs/contributors"><img src="https://opencollective.com/openvidu/contributors.svg?width=890&button=false" /></a>
-
-
-## Backers
-
-Thank you to all our backers! 🙏 [[Become a backer](https://opencollective.com/openvidu#backer)]
-
-<a href="https://opencollective.com/openvidu#backers" target="_blank"><img src="https://opencollective.com/openvidu/backers.svg?width=890"></a>
-
-
-## Sponsors
-
-Support this project by becoming a sponsor. Your logo will show up here with a link to your website. [[Become a sponsor](https://opencollective.com/openvidu#sponsor)]
-
-<a href="https://opencollective.com/openvidu/sponsor/0/website" target="_blank"><img src="https://opencollective.com/openvidu/sponsor/0/avatar.svg"></a>
-<a href="https://opencollective.com/openvidu/sponsor/1/website" target="_blank"><img src="https://opencollective.com/openvidu/sponsor/1/avatar.svg"></a>
-<a href="https://opencollective.com/openvidu/sponsor/2/website" target="_blank"><img src="https://opencollective.com/openvidu/sponsor/2/avatar.svg"></a>
-<a href="https://opencollective.com/openvidu/sponsor/3/website" target="_blank"><img src="https://opencollective.com/openvidu/sponsor/3/avatar.svg"></a>
-<a href="https://opencollective.com/openvidu/sponsor/4/website" target="_blank"><img src="https://opencollective.com/openvidu/sponsor/4/avatar.svg"></a>
-<a href="https://opencollective.com/openvidu/sponsor/5/website" target="_blank"><img src="https://opencollective.com/openvidu/sponsor/5/avatar.svg"></a>
-<a href="https://opencollective.com/openvidu/sponsor/6/website" target="_blank"><img src="https://opencollective.com/openvidu/sponsor/6/avatar.svg"></a>
-<a href="https://opencollective.com/openvidu/sponsor/7/website" target="_blank"><img src="https://opencollective.com/openvidu/sponsor/7/avatar.svg"></a>
-<a href="https://opencollective.com/openvidu/sponsor/8/website" target="_blank"><img src="https://opencollective.com/openvidu/sponsor/8/avatar.svg"></a>
-<a href="https://opencollective.com/openvidu/sponsor/9/website" target="_blank"><img src="https://opencollective.com/openvidu/sponsor/9/avatar.svg"></a>
-
-
+This feature will add support for streaming calls in the OpenVidu platform.
