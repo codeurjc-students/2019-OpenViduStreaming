@@ -1,5 +1,5 @@
 /*
- * (C) Copyright 2017-2019 OpenVidu (https://openvidu.io/)
+ * (C) Copyright 2017-2020 OpenVidu (https://openvidu.io)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -46,7 +46,6 @@ public class CustomWebhook {
 
 	public static CountDownLatch initLatch;
 	private static Map<String, BlockingQueue<JsonObject>> events = new ConcurrentHashMap<>();
-	private static JsonParser jsonParser = new JsonParser();
 
 	public static void main(String[] args, CountDownLatch initLatch) {
 		CustomWebhook.initLatch = initLatch;
@@ -76,7 +75,7 @@ public class CustomWebhook {
 	public class WebhookController {
 		@RequestMapping("/webhook")
 		public void webhook(@RequestBody String eventString) {
-			JsonObject event = (JsonObject) jsonParser.parse(eventString);
+			JsonObject event = JsonParser.parseString(eventString).getAsJsonObject();
 			final String eventName = event.get("event").getAsString();
 			System.out.println("Webhook event: " + event.toString());
 			if (events.get(eventName) == null) {

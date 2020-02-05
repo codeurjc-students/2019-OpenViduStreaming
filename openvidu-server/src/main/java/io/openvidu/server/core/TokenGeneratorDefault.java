@@ -1,5 +1,5 @@
 /*
- * (C) Copyright 2017-2019 OpenVidu (https://openvidu.io/)
+ * (C) Copyright 2017-2020 OpenVidu (https://openvidu.io)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,13 +40,15 @@ public class TokenGeneratorDefault implements TokenGenerator {
 			KurentoTokenOptions kurentoTokenOptions) {
 		String token = OpenViduServer.wsUrl;
 		token += "?sessionId=" + sessionId;
-		token += "&token=" + RandomStringUtils.randomAlphanumeric(16).toLowerCase();
+		token += "&token=" + IdentifierPrefixes.TOKEN_ID + RandomStringUtils.randomAlphabetic(1).toUpperCase()
+				+ RandomStringUtils.randomAlphanumeric(15);
 		token += "&role=" + role.name();
 		token += "&version=" + openviduConfig.getOpenViduServerVersion();
 		TurnCredentials turnCredentials = null;
 		if (this.coturnCredentialsService.isCoturnAvailable()) {
 			turnCredentials = coturnCredentialsService.createUser();
 			if (turnCredentials != null) {
+				token += "&coturnIp=" + openviduConfig.getCoturnIp();
 				token += "&turnUsername=" + turnCredentials.getUsername();
 				token += "&turnCredential=" + turnCredentials.getCredential();
 			}

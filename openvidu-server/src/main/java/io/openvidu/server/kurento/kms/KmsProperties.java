@@ -1,5 +1,5 @@
 /*
- * (C) Copyright 2017-2019 OpenVidu (https://openvidu.io/)
+ * (C) Copyright 2017-2020 OpenVidu (https://openvidu.io)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ package io.openvidu.server.kurento.kms;
 
 public class KmsProperties {
 
-	private String id;
+	private String id; // Dynamic ID
 	private String uri;
 
 	public KmsProperties(String id, String uri) {

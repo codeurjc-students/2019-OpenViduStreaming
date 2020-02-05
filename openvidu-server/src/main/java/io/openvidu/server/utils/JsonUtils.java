@@ -1,5 +1,5 @@
 /*
- * (C) Copyright 2017-2019 OpenVidu (https://openvidu.io/)
+ * (C) Copyright 2017-2020 OpenVidu (https://openvidu.io)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -57,7 +57,6 @@ public class JsonUtils {
 	public JsonElement fromFileToJsonElement(String filePath)
 			throws IOException, FileNotFoundException, JsonParseException, IllegalStateException {
 		JsonElement json = null;
-		JsonParser parser = new JsonParser();
 		FileReader reader = null;
 		try {
 			reader = new FileReader(filePath);
@@ -65,7 +64,7 @@ public class JsonUtils {
 			throw e;
 		}
 		try {
-			json = parser.parse(reader);
+			json = JsonParser.parseReader(reader);
 		} catch (JsonParseException | IllegalStateException exception) {
 			throw exception;
 		} finally {

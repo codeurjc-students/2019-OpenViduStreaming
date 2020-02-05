@@ -1,5 +1,5 @@
 /*
- * (C) Copyright 2017-2019 OpenVidu (https://openvidu.io/)
+ * (C) Copyright 2017-2020 OpenVidu (https://openvidu.io)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,6 +30,7 @@ import org.slf4j.LoggerFactory;
 import com.google.gson.JsonObject;
 
 import io.openvidu.client.OpenViduException;
+import io.openvidu.server.core.IdentifierPrefixes;
 
 public class RpcNotificationService {
 
@@ -58,8 +59,10 @@ public class RpcNotificationService {
 	public void sendResponse(String participantPrivateId, Integer transactionId, Object result) {
 		Transaction t = getAndRemoveTransaction(participantPrivateId, transactionId);
 		if (t == null) {
-			log.error("No transaction {} found for paticipant with private id {}, unable to send result {}",
-					transactionId, participantPrivateId, result);
+			if (!isIpcamParticipant(participantPrivateId)) {
+				log.error("No transaction {} found for paticipant with private id {}, unable to send result {}",
+						transactionId, participantPrivateId, result);
+			}
 			return;
 		}
 		try {
@@ -73,8 +76,10 @@ public class RpcNotificationService {
 			OpenViduException error) {
 		Transaction t = getAndRemoveTransaction(participantPrivateId, transactionId);
 		if (t == null) {
-			log.error("No transaction {} found for paticipant with private id {}, unable to send result {}",
-					transactionId, participantPrivateId, data);
+			if (!isIpcamParticipant(participantPrivateId)) {
+				log.error("No transaction {} found for paticipant with private id {}, unable to send result {}",
+						transactionId, participantPrivateId, data);
+			}
 			return;
 		}
 		try {
@@ -88,8 +93,10 @@ public class RpcNotificationService {
 	public void sendNotification(final String participantPrivateId, final String method, final Object params) {
 		RpcConnection rpcSession = rpcConnections.get(participantPrivateId);
 		if (rpcSession == null || rpcSession.getSession() == null) {
-			log.error("No rpc session found for private id {}, unable to send notification {}: {}",
-					participantPrivateId, method, params);
+			if (!isIpcamParticipant(participantPrivateId)) {
+				log.error("No rpc session found for private id {}, unable to send notification {}: {}",
+						participantPrivateId, method, params);
+			}
 			return;
 		}
 		Session s = rpcSession.getSession();
@@ -105,7 +112,9 @@ public class RpcNotificationService {
 	public RpcConnection closeRpcSession(String participantPrivateId) {
 		RpcConnection rpcSession = rpcConnections.remove(participantPrivateId);
 		if (rpcSession == null || rpcSession.getSession() == null) {
-			log.error("No session found for private id {}, unable to cleanup", participantPrivateId);
+			if (!isIpcamParticipant(participantPrivateId)) {
+				log.error("No session found for private id {}, unable to cleanup", participantPrivateId);
+			}
 			return null;
 		}
 		Session s = rpcSession.getSession();
@@ -123,7 +132,9 @@ public class RpcNotificationService {
 	private Transaction getAndRemoveTransaction(String participantPrivateId, Integer transactionId) {
 		RpcConnection rpcSession = rpcConnections.get(participantPrivateId);
 		if (rpcSession == null) {
-			log.warn("Invalid WebSocket session id {}", participantPrivateId);
+			if (!isIpcamParticipant(participantPrivateId)) {
+				log.warn("Invalid WebSocket session id {}", participantPrivateId);
+			}
 			return null;
 		}
 		log.trace("#{} - {} transactions", participantPrivateId, rpcSession.getTransactions().size());
@@ -138,6 +149,10 @@ public class RpcNotificationService {
 
 	public RpcConnection getRpcConnection(String participantPrivateId) {
 		return this.rpcConnections.get(participantPrivateId);
+	}
+
+	private boolean isIpcamParticipant(String participantPrivateId) {
+		return participantPrivateId.startsWith(IdentifierPrefixes.IPCAM_ID);
 	}
 
 }

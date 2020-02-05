@@ -1,5 +1,5 @@
 /*
- * (C) Copyright 2017-2019 OpenVidu (https://openvidu.io/)
+ * (C) Copyright 2017-2020 OpenVidu (https://openvidu.io)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,9 +19,12 @@ package io.openvidu.server.config;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.Inet6Address;
 import java.net.MalformedURLException;
+import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.net.UnknownHostException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -32,6 +35,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -45,6 +50,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.info.BuildProperties;
+import org.springframework.core.env.AbstractEnvironment;
+import org.springframework.core.env.EnumerablePropertySource;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.PropertySource;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.support.PropertiesLoaderUtils;
 import org.springframework.stereotype.Component;
@@ -67,7 +76,7 @@ public class OpenviduConfig {
 	public static final Set<String> OPENVIDU_STRING_PROPERTIES = new HashSet<>(Arrays.asList("openvidu.secret",
 			"openvidu.publicurl", "openvidu.recording.path", "openvidu.recording.notification",
 			"openvidu.recording.custom-layout", "openvidu.recording.composed-url", "openvidu.recording.version",
-			"openvidu.webhook.endpoint", "openvidu.cdr.path"));
+			"openvidu.webhook.endpoint", "openvidu.cdr.path", "coturn.ip", "coturn.redis.ip"));
 
 	public static final Set<String> OPENVIDU_INTEGER_PROPERTIES = new HashSet<>(
 			Arrays.asList("openvidu.recording.autostop-timeout", "openvidu.streams.video.max-recv-bandwidth",
@@ -171,6 +180,9 @@ public class OpenviduConfig {
 	@Value("${coturn.redis.connect-timeout}")
 	protected String coturnRedisConnectTimeout;
 
+	@Value("#{'${coturn.ip:}'.length() > 0 ? '${coturn.ip:}' : \"\"}")
+	protected String coturnIp;
+
 	@Value("#{'${spring.profiles.active:}'.length() > 0 ? '${spring.profiles.active:}'.split(',') : \"default\"}")
 	protected String springProfile;
 
@@ -179,6 +191,9 @@ public class OpenviduConfig {
 	public static List<Header> webhookHeadersList = new ArrayList<>();
 	public static List<CDREventName> webhookEventsList = new ArrayList<>();
 	public static Properties externalizedProperties;
+
+	@Autowired
+	protected Environment env;
 
 	public List<String> getKmsUris() {
 		return kmsUrisList;
@@ -272,6 +287,10 @@ public class OpenviduConfig {
 		return this.openviduStreamsVideoMinSendBandwidth;
 	}
 
+	public String getCoturnIp() {
+		return this.coturnIp;
+	}
+
 	public String getCoturnDatabaseString() {
 		return "\"ip=" + this.coturnRedisIp + " dbname=" + this.coturnRedisDbname + " password="
 				+ this.coturnRedisPassword + " connect_timeout=" + this.coturnRedisConnectTimeout + "\"";
@@ -350,13 +369,13 @@ public class OpenviduConfig {
 		return externalizedProperties;
 	}
 
-	public void checkWebsocketUri(String uri) throws Exception {
+	public URI checkWebsocketUri(String uri) throws Exception {
 		try {
 			if (!uri.startsWith("ws://") || uri.startsWith("wss://")) {
 				throw new Exception("WebSocket protocol not found");
 			}
 			String parsedUri = uri.replaceAll("^ws://", "http://").replaceAll("^wss://", "https://");
-			new URL(parsedUri).toURI();
+			return new URL(parsedUri).toURI();
 		} catch (Exception e) {
 			throw new Exception("URI '" + uri + "' has not a valid WebSocket endpoint format: " + e.getMessage());
 		}
@@ -367,6 +386,21 @@ public class OpenviduConfig {
 			new URL(url).toURI();
 		} catch (MalformedURLException | URISyntaxException e) {
 			throw new Exception("String '" + url + "' has not a valid URL format: " + e.getMessage());
+		}
+	}
+
+	/*
+	 * This method checks all types of internet addresses (IPv4, IPv6 and Domains)
+	 */
+	public void checkStringValidInetAddress(Map<String, ?> parameters, String key) throws Exception {
+		String inetAddress = this.checkString(parameters, key);
+		if (!inetAddress.isEmpty()) {
+			try {
+				Inet6Address.getByName(inetAddress).getHostAddress();
+			} catch (UnknownHostException e) {
+				throw new Exception("String value: ''" + inetAddress + "' with key: '" + key
+						+ "' is not a valid Internet Address (IP or Domain Name): " + e.getMessage());
+			}
 		}
 	}
 
@@ -439,11 +473,6 @@ public class OpenviduConfig {
 				break;
 			case "openvidu.webhook.endpoint":
 				webhookEndpoint = checkString(parameters, parameter);
-				try {
-					checkWebhookEndpoint(webhookEndpoint);
-				} catch (Exception e) {
-					throw new Exception("Property 'openvidu.webhook.endpoint' is not valid: " + e.getMessage());
-				}
 				break;
 			case "openvidu.streams.video.max-recv-bandwidth":
 				checkIntegerNonNegative(parameters, parameter, admitStringified);
@@ -553,7 +582,9 @@ public class OpenviduConfig {
 			case "openvidu.recording.composed-url":
 				String composedUrl = checkString(parameters, parameter);
 				try {
-					checkUrl(composedUrl);
+					if (!composedUrl.isEmpty()) {
+						checkUrl(composedUrl);
+					}
 				} catch (Exception e) {
 					throw new Exception("Property 'openvidu.recording.composed-url' not valid. " + e.getMessage());
 				}
@@ -563,6 +594,12 @@ public class OpenviduConfig {
 				break;
 			case "openvidu.cdr.path":
 				checkStringValidPathFormat(parameters, parameter);
+				break;
+			case "coturn.ip":
+				checkStringValidInetAddress(parameters, parameter);
+				break;
+			case "coturn.redis.ip":
+				checkStringValidInetAddress(parameters, parameter);
 				break;
 			default:
 				log.warn("Unknown configuration parameter '{}'", parameter);
@@ -716,8 +753,7 @@ public class OpenviduConfig {
 	}
 
 	private List<Header> checkWebhookHeaders(String headers) throws Exception {
-		JsonParser parser = new JsonParser();
-		JsonElement elem = parser.parse(headers);
+		JsonElement elem = JsonParser.parseString(headers);
 		JsonArray headersJsonArray = elem.getAsJsonArray();
 		List<Header> headerList = new ArrayList<>();
 
@@ -744,8 +780,7 @@ public class OpenviduConfig {
 	}
 
 	private List<CDREventName> checkWebhookEvents(String events) throws Exception {
-		JsonParser parser = new JsonParser();
-		JsonElement elem = parser.parse(events);
+		JsonElement elem = JsonParser.parseString(events);
 		JsonArray eventsJsonArray = elem.getAsJsonArray();
 		List<CDREventName> eventList = new ArrayList<>();
 
@@ -779,21 +814,8 @@ public class OpenviduConfig {
 
 	@PostConstruct
 	protected void init() {
-
 		// Check configuration parameters
-		Map<String, ?> props = null;
-		if (!this.springConfigLocation.isEmpty()) {
-			try {
-				externalizedProperties = this.retrieveExternalizedProperties();
-				props = (Map) this.externalizedProperties;
-			} catch (Exception e) {
-				log.error(e.getMessage());
-				log.error("Shutting down OpenVidu Server");
-				System.exit(1);
-			}
-		} else {
-			props = (Map) System.getProperties();
-		}
+		Map<String, ?> props = getFinalPropertiesInUse();
 
 		try {
 			this.checkConfigurationParameters(props, OPENVIDU_PROPERTIES, true);
@@ -856,6 +878,28 @@ public class OpenviduConfig {
 		this.setFinalUrl(finalUrl);
 		OpenViduServer.httpUrl = this.getFinalUrl();
 		OpenViduServer.publicurlType = type;
+
+		if (this.coturnIp.isEmpty()) {
+
+			try {
+				this.coturnIp = new URL(this.getFinalUrl()).getHost();
+				log.info("Coturn IP: " + coturnIp);
+			} catch (MalformedURLException e) {
+				log.error("Can't get Domain name from OpenVidu public Url: " + e.getMessage());
+			}
+		}
+
+	}
+
+	protected Map<String, Object> getFinalPropertiesInUse() {
+		final SortedMap<String, Object> props = new TreeMap<>();
+		for (final PropertySource<?> propertySource : ((AbstractEnvironment) env).getPropertySources()) {
+			if (!(propertySource instanceof EnumerablePropertySource))
+				continue;
+			for (final String name : ((EnumerablePropertySource<?>) propertySource).getPropertyNames())
+				props.computeIfAbsent(name, propertySource::getProperty);
+		}
+		return props;
 	}
 
 	private String listToQuotedStringifiedArray(List<String> list) {

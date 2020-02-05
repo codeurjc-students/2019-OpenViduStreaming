@@ -1,5 +1,5 @@
 /*
- * (C) Copyright 2017-2019 OpenVidu (https://openvidu.io/)
+ * (C) Copyright 2017-2020 OpenVidu (https://openvidu.io)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -86,14 +86,8 @@ export class WebRtcPeer {
                 reject('The peer connection object is in "closed" state. This is most likely due to an invocation of the dispose method before accepting in the dialogue');
             }
             if (!!this.configuration.mediaStream) {
-                if (platform['isIonicIos']) {
-                    // iOS Ionic. LIMITATION: must use deprecated WebRTC API
-                    const pc2: any = this.pc;
-                    pc2.addStream(this.configuration.mediaStream);
-                } else {
-                    for (const track of this.configuration.mediaStream.getTracks()) {
-                        this.pc.addTrack(track, this.configuration.mediaStream);
-                    }
+                for (const track of this.configuration.mediaStream.getTracks()) {
+                    this.pc.addTrack(track, this.configuration.mediaStream);
                 }
                 resolve();
             }
@@ -112,41 +106,21 @@ export class WebRtcPeer {
                 }
                 this.remoteCandidatesQueue = [];
                 this.localCandidatesQueue = [];
-
-                if (platform['isIonicIos']) {
-                    // iOS Ionic. LIMITATION: must use deprecated WebRTC API
-                    // Stop senders deprecated
-                    const pc1: any = this.pc;
-                    for (const sender of pc1.getLocalStreams()) {
-                        if (!videoSourceIsMediaStreamTrack) {
-                            sender.stop();
-                        }
-                        pc1.removeStream(sender);
-                    }
-                    // Stop receivers deprecated
-                    for (const receiver of pc1.getRemoteStreams()) {
-                        if (!!receiver.track) {
-                            receiver.stop();
+                // Stop senders
+                for (const sender of this.pc.getSenders()) {
+                    if (!videoSourceIsMediaStreamTrack) {
+                        if (!!sender.track) {
+                            sender.track.stop();
                         }
                     }
-                } else {
-                    // Stop senders
-                    for (const sender of this.pc.getSenders()) {
-                        if (!videoSourceIsMediaStreamTrack) {
-                            if (!!sender.track) {
-                                sender.track.stop();
-                            }
-                        }
-                        this.pc.removeTrack(sender);
-                    }
-                    // Stop receivers
-                    for (const receiver of this.pc.getReceivers()) {
-                        if (!!receiver.track) {
-                            receiver.track.stop();
-                        }
+                    this.pc.removeTrack(sender);
+                }
+                // Stop receivers
+                for (const receiver of this.pc.getReceivers()) {
+                    if (!!receiver.track) {
+                        receiver.track.stop();
                     }
                 }
-
                 this.pc.close();
             }
         } catch (err) {

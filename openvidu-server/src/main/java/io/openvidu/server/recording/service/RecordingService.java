@@ -1,5 +1,5 @@
 /*
- * (C) Copyright 2017-2019 OpenVidu (https://openvidu.io/)
+ * (C) Copyright 2017-2020 OpenVidu (https://openvidu.io)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,6 +34,7 @@ import io.openvidu.server.recording.Recording;
 import io.openvidu.server.recording.RecordingDownloader;
 import io.openvidu.server.utils.CommandExecutor;
 import io.openvidu.server.utils.CustomFileManager;
+import io.openvidu.server.utils.QuarantineKiller;
 
 public abstract class RecordingService {
 
@@ -43,14 +44,16 @@ public abstract class RecordingService {
 	protected RecordingManager recordingManager;
 	protected RecordingDownloader recordingDownloader;
 	protected CallDetailRecord cdr;
+	protected QuarantineKiller quarantineKiller;
 	protected CustomFileManager fileWriter = new CustomFileManager();
 
 	RecordingService(RecordingManager recordingManager, RecordingDownloader recordingDownloader,
-			OpenviduConfig openviduConfig, CallDetailRecord cdr) {
+			OpenviduConfig openviduConfig, CallDetailRecord cdr, QuarantineKiller quarantineKiller) {
 		this.recordingManager = recordingManager;
 		this.recordingDownloader = recordingDownloader;
 		this.openviduConfig = openviduConfig;
 		this.cdr = cdr;
+		this.quarantineKiller = quarantineKiller;
 	}
 
 	public abstract Recording startRecording(Session session, RecordingProperties properties) throws OpenViduException;
@@ -104,7 +107,7 @@ public abstract class RecordingService {
 		io.openvidu.java.client.Recording.Status status = io.openvidu.java.client.Recording.Status.failed
 				.equals(recording.getStatus()) ? io.openvidu.java.client.Recording.Status.failed
 						: io.openvidu.java.client.Recording.Status.ready;
-		
+
 		// Status is now failed or ready. Url property must be defined
 		recording.setUrl(recordingManager.getRecordingUrl(recording));
 
@@ -133,8 +136,7 @@ public abstract class RecordingService {
 	 */
 	protected PropertiesRecordingId setFinalRecordingNameAndGetFreeRecordingId(Session session,
 			RecordingProperties properties) {
-		String recordingId = this.recordingManager.getFreeRecordingId(session.getSessionId(),
-				this.getShortSessionId(session));
+		String recordingId = this.recordingManager.getFreeRecordingId(session.getSessionId());
 		if (properties.name() == null || properties.name().isEmpty()) {
 			// No name provided for the recording file. Use recordingId
 			RecordingProperties.Builder builder = new RecordingProperties.Builder().name(recordingId)
@@ -167,11 +169,6 @@ public abstract class RecordingService {
 		} catch (IOException | InterruptedException e) {
 			log.error("KMS recording file permissions failed to update. Error: {}", e.getMessage());
 		}
-	}
-
-	protected String getShortSessionId(Session session) {
-		return session.getSessionId().substring(session.getSessionId().lastIndexOf('/') + 1,
-				session.getSessionId().length());
 	}
 
 	protected OpenViduException failStartRecording(Session session, Recording recording, String errorMessage) {

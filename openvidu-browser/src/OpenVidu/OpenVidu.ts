@@ -1,5 +1,5 @@
 /*
- * (C) Copyright 2017-2019 OpenVidu (https://openvidu.io/)
+ * (C) Copyright 2017-2020 OpenVidu (https://openvidu.io)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -483,7 +483,7 @@ export class OpenVidu {
    * var FRAME_RATE = 10;
    *
    * OV.getUserMedia({
-   *    audioSource: false;
+   *    audioSource: false,
    *    videoSource: undefined,
    *    resolution: '1280x720',
    *    frameRate: FRAME_RATE
@@ -566,6 +566,7 @@ export class OpenVidu {
                     reject(new OpenViduError(errorName, errorMessage));
                   });
               }
+              return;
             }
           }
           const constraintsAux = mustAskForAudioTrackLater ? { video: constraints.video } : constraints;
@@ -613,7 +614,9 @@ export class OpenVidu {
    * Set OpenVidu advanced configuration options. Currently `configuration` is an object with the following optional properties (see [[OpenViduAdvancedConfiguration]] for more details):
    * - `iceServers`: set custom STUN/TURN servers to be used by OpenVidu Browser
    * - `screenShareChromeExtension`: url to a custom screen share extension for Chrome to be used instead of the default one, based on ours [https://github.com/OpenVidu/openvidu-screen-sharing-chrome-extension](https://github.com/OpenVidu/openvidu-screen-sharing-chrome-extension)
-   * - `publisherSpeakingEventsOptions`: custom configuration for the [[PublisherSpeakingEvent]] feature
+   * - `publisherSpeakingEventsOptions`: custom configuration for the [[PublisherSpeakingEvent]] feature and the [StreamManagerEvent.streamAudioVolumeChange](/api/openvidu-browser/classes/streammanagerevent.html) feature
+   *
+   * Call this method to override previous values at any moment.
    */
   setAdvancedConfiguration(configuration: OpenViduAdvancedConfiguration): void {
     this.advancedConfiguration = configuration;

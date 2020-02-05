@@ -1,5 +1,5 @@
 /*
- * (C) Copyright 2017-2019 OpenVidu (https://openvidu.io/)
+ * (C) Copyright 2017-2020 OpenVidu (https://openvidu.io)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -73,6 +73,7 @@ import io.openvidu.server.recording.RecordingDownloader;
 import io.openvidu.server.utils.CustomFileManager;
 import io.openvidu.server.utils.DockerManager;
 import io.openvidu.server.utils.JsonUtils;
+import io.openvidu.server.utils.QuarantineKiller;
 
 public class RecordingManager {
 
@@ -98,6 +99,9 @@ public class RecordingManager {
 	private KmsManager kmsManager;
 
 	@Autowired
+	protected QuarantineKiller quarantineKiller;
+
+	@Autowired
 	private CallDetailRecord cdr;
 
 	protected Map<String, Recording> startingRecordings = new ConcurrentHashMap<>();
@@ -121,6 +125,7 @@ public class RecordingManager {
 	@PostConstruct
 	public void init() {
 		if (this.openviduConfig.isRecordingModuleEnabled()) {
+			log.info("OpenVidu recording service is enabled");
 			try {
 				this.initializeRecordingManager();
 			} catch (OpenViduException e) {
@@ -139,6 +144,8 @@ public class RecordingManager {
 				log.error(finalErrorMessage + ". Shutting down OpenVidu Server");
 				System.exit(1);
 			}
+		} else {
+			log.info("OpenVidu recording service is disabled");
 		}
 	}
 
@@ -147,9 +154,10 @@ public class RecordingManager {
 		RecordingManager.IMAGE_TAG = openviduConfig.getOpenViduRecordingVersion();
 
 		this.dockerManager = new DockerManager();
-		this.composedRecordingService = new ComposedRecordingService(this, recordingDownloader, openviduConfig, cdr);
+		this.composedRecordingService = new ComposedRecordingService(this, recordingDownloader, openviduConfig, cdr,
+				quarantineKiller);
 		this.singleStreamRecordingService = new SingleStreamRecordingService(this, recordingDownloader, openviduConfig,
-				cdr);
+				cdr, quarantineKiller);
 
 		log.info("Recording module required: Downloading openvidu/openvidu-recording:"
 				+ openviduConfig.getOpenViduRecordingVersion() + " Docker image (350MB aprox)");
@@ -380,18 +388,16 @@ public class RecordingManager {
 		return this.getAllRecordingsFromHost();
 	}
 
-	public String getFreeRecordingId(String sessionId, String shortSessionId) {
+	public String getFreeRecordingId(String sessionId) {
 		Set<String> recordingIds = this.getRecordingIdsFromHost();
-		String recordingId = shortSessionId;
+		String recordingId = sessionId;
 		boolean isPresent = recordingIds.contains(recordingId);
 		int i = 1;
-
 		while (isPresent) {
-			recordingId = shortSessionId + "-" + i;
+			recordingId = sessionId + "-" + i;
 			i++;
 			isPresent = recordingIds.contains(recordingId);
 		}
-
 		return recordingId;
 	}
 
@@ -466,51 +472,74 @@ public class RecordingManager {
 
 	public void initAutomaticRecordingStopThread(final Session session) {
 		final String recordingId = this.sessionsRecordings.get(session.getSessionId()).getId();
-		ScheduledFuture<?> future = this.automaticRecordingStopExecutor.schedule(() -> {
 
-			log.info("Stopping recording {} after {} seconds wait (no publisher published before timeout)", recordingId,
-					this.openviduConfig.getOpenviduRecordingAutostopTimeout());
+		this.automaticRecordingStopThreads.computeIfAbsent(session.getSessionId(), f -> {
 
-			if (this.automaticRecordingStopThreads.remove(session.getSessionId()) != null) {
-				if (session.getParticipants().size() == 0 || (session.getParticipants().size() == 1
-						&& session.getParticipantByPublicId(ProtocolElements.RECORDER_PARTICIPANT_PUBLICID) != null)) {
-					// Close session if there are no participants connected (except for RECORDER).
-					// This code won't be executed only when some user reconnects to the session
-					// but never publishing (publishers automatically abort this thread)
-					log.info("Closing session {} after automatic stop of recording {}", session.getSessionId(),
-							recordingId);
-					sessionManager.closeSessionAndEmptyCollections(session, EndReason.automaticStop);
-					sessionManager.showTokens();
+			ScheduledFuture<?> future = this.automaticRecordingStopExecutor.schedule(() -> {
+				log.info("Stopping recording {} after {} seconds wait (no publisher published before timeout)",
+						recordingId, this.openviduConfig.getOpenviduRecordingAutostopTimeout());
+
+				if (this.automaticRecordingStopThreads.remove(session.getSessionId()) != null) {
+
+					boolean alreadyUnlocked = false;
+					try {
+						session.closingLock.writeLock().lock();
+						if (session.isClosed()) {
+							return;
+						}
+
+						if (session.getParticipants().size() == 0 || session.onlyRecorderParticipant()) {
+							// Close session if there are no participants connected (RECORDER does not
+							// count) and publishing
+							log.info("Closing session {} after automatic stop of recording {}", session.getSessionId(),
+									recordingId);
+							sessionManager.closeSessionAndEmptyCollections(session, EndReason.automaticStop, true);
+						} else {
+							// There are users connected, but no one is publishing
+							session.closingLock.writeLock().unlock(); // We don't need the lock if session's not closing
+							alreadyUnlocked = true;
+							log.info(
+									"Automatic stopping recording {}. There are users connected to session {}, but no one is publishing",
+									recordingId, session.getSessionId());
+							this.stopRecording(session, recordingId, EndReason.automaticStop);
+						}
+					} finally {
+						if (!alreadyUnlocked) {
+							session.closingLock.writeLock().unlock();
+						}
+					}
 				} else {
-					this.stopRecording(session, recordingId, EndReason.automaticStop);
+					// This code shouldn't be reachable
+					log.warn("Recording {} was already automatically stopped by a previous thread", recordingId);
 				}
-			} else {
-				// This code is reachable if there already was an automatic stop of a recording
-				// caused by not user publishing within timeout after recording started, and a
-				// new automatic stop thread was started by last user leaving the session
-				log.warn("Recording {} was already automatically stopped by a previous thread", recordingId);
-			}
+			}, this.openviduConfig.getOpenviduRecordingAutostopTimeout(), TimeUnit.SECONDS);
 
-		}, this.openviduConfig.getOpenviduRecordingAutostopTimeout(), TimeUnit.SECONDS);
-		this.automaticRecordingStopThreads.putIfAbsent(session.getSessionId(), future);
+			return future;
+		});
 	}
 
 	public boolean abortAutomaticRecordingStopThread(Session session, EndReason reason) {
 		ScheduledFuture<?> future = this.automaticRecordingStopThreads.remove(session.getSessionId());
 		if (future != null) {
 			boolean cancelled = future.cancel(false);
-			if (session.getParticipants().size() == 0 || (session.getParticipants().size() == 1
-					&& session.getParticipantByPublicId(ProtocolElements.RECORDER_PARTICIPANT_PUBLICID) != null)) {
-				// Close session if there are no participants connected (except for RECORDER).
-				// This code will only be executed if recording is manually stopped during the
-				// automatic stop timeout, so the session must be also closed
-				log.info(
-						"Ongoing recording of session {} was explicetly stopped within timeout for automatic recording stop. Closing session",
-						session.getSessionId());
-				sessionManager.closeSessionAndEmptyCollections(session, reason);
-				sessionManager.showTokens();
+			try {
+				session.closingLock.writeLock().lock();
+				if (session.isClosed()) {
+					return false;
+				}
+				if (session.getParticipants().size() == 0 || session.onlyRecorderParticipant()) {
+					// Close session if there are no participants connected (except for RECORDER).
+					// This code will only be executed if recording is manually stopped during the
+					// automatic stop timeout, so the session must be also closed
+					log.info(
+							"Ongoing recording of session {} was explicetly stopped within timeout for automatic recording stop. Closing session",
+							session.getSessionId());
+					sessionManager.closeSessionAndEmptyCollections(session, reason, false);
+				}
+				return cancelled;
+			} finally {
+				session.closingLock.writeLock().unlock();
 			}
-			return cancelled;
 		} else {
 			return true;
 		}
@@ -600,7 +629,8 @@ public class RecordingManager {
 			log.warn("No KMSs were defined in kms.uris array. Recording path check aborted");
 		} else {
 
-			MediaPipeline pipeline = this.kmsManager.getLessLoadedKms().getKurentoClient().createMediaPipeline();
+			MediaPipeline pipeline = this.kmsManager.getLessLoadedAndRunningKms().getKurentoClient()
+					.createMediaPipeline();
 			RecorderEndpoint recorder = new RecorderEndpoint.Builder(pipeline, "file://" + testFilePath).build();
 
 			final AtomicBoolean kurentoRecorderError = new AtomicBoolean(false);

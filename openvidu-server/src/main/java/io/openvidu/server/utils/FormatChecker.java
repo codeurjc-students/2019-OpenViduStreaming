@@ -1,5 +1,5 @@
 /*
- * (C) Copyright 2017-2019 OpenVidu (https://openvidu.io/)
+ * (C) Copyright 2017-2020 OpenVidu (https://openvidu.io)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,9 +24,14 @@ public class FormatChecker {
 		// with 0 and 3 digits long or 4 digits long if they start with 1
 		return stringResolution.matches("^(?!(0))(([0-9]{3})|1([0-9]{3}))x(?!0)(([0-9]{3})|1([0-9]{3}))$");
 	}
-	
+
 	public boolean isServerMetadataFormatCorrect(String metadata) {
 		return true;
+	}
+
+	public boolean isValidCustomSessionId(String customSessionId) {
+		// Alphanumeric string
+		return customSessionId.matches("[a-zA-Z0-9_-]+");
 	}
 
 }

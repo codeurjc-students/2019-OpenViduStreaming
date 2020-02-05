@@ -1,5 +1,5 @@
 /*
- * (C) Copyright 2017-2019 OpenVidu (https://openvidu.io/)
+ * (C) Copyright 2017-2020 OpenVidu (https://openvidu.io)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,6 +47,7 @@ import io.openvidu.client.OpenViduException.Code;
 import io.openvidu.client.internal.ProtocolElements;
 import io.openvidu.server.config.OpenviduConfig;
 import io.openvidu.server.core.EndReason;
+import io.openvidu.server.core.IdentifierPrefixes;
 import io.openvidu.server.core.MediaOptions;
 import io.openvidu.server.core.Participant;
 import io.openvidu.server.core.SessionManager;
@@ -175,6 +176,13 @@ public class RpcHandler extends DefaultJsonRpcHandler<JsonObject> {
 		String platform = getStringParam(request, ProtocolElements.JOINROOM_PLATFORM_PARAM);
 		String participantPrivatetId = rpcConnection.getParticipantPrivateId();
 
+		final io.openvidu.server.core.Session session = sessionManager.getSessionWithNotActive(sessionId);
+		if (session == null) {
+			log.error("ERROR: Session {} not found", sessionId);
+			throw new OpenViduException(Code.ROOM_NOT_FOUND_ERROR_CODE,
+					"Unable to join session. Session " + sessionId + " cannot be found");
+		}
+
 		InetAddress remoteAddress = null;
 		GeoLocation location = null;
 		Object obj = rpcConnection.getSession().getAttributes().get("remoteAddress");
@@ -231,42 +239,58 @@ public class RpcHandler extends DefaultJsonRpcHandler<JsonObject> {
 
 		if (openviduConfig.isOpenViduSecret(secret)) {
 			sessionManager.newInsecureParticipant(participantPrivatetId);
-			token = RandomStringUtils.randomAlphanumeric(16).toLowerCase();
+			token = IdentifierPrefixes.TOKEN_ID + RandomStringUtils.randomAlphabetic(1).toUpperCase()
+					+ RandomStringUtils.randomAlphanumeric(15);
+			sessionManager.newTokenForInsecureUser(session, token, null);
 			if (recorder) {
 				generateRecorderParticipant = true;
 			}
 		}
 
-		if (sessionManager.isTokenValidInSession(token, sessionId, participantPrivatetId)) {
-
+		Token tokenObj = session.consumeToken(token);
+		if (tokenObj != null) {
 			String clientMetadata = getStringParam(request, ProtocolElements.JOINROOM_METADATA_PARAM);
-
 			if (sessionManager.formatChecker.isServerMetadataFormatCorrect(clientMetadata)) {
 
-				Token tokenObj = sessionManager.consumeToken(sessionId, participantPrivatetId, token);
-				Participant participant;
+				// While closing a session users can't join
+				if (session.closingLock.readLock().tryLock()) {
+					if (session.isClosed()) {
+						throw new OpenViduException(Code.ROOM_CLOSED_ERROR_CODE,
+								"Unable to join the session. Session " + sessionId + " is closed");
+					}
+					try {
+						Participant participant;
+						if (generateRecorderParticipant) {
+							participant = sessionManager.newRecorderParticipant(sessionId, participantPrivatetId,
+									tokenObj, clientMetadata);
+						} else {
+							participant = sessionManager.newParticipant(sessionId, participantPrivatetId, tokenObj,
+									clientMetadata, location, platform,
+									httpSession.getId().substring(0, Math.min(16, httpSession.getId().length())));
+						}
 
-				if (generateRecorderParticipant) {
-					participant = sessionManager.newRecorderParticipant(sessionId, participantPrivatetId, tokenObj,
-							clientMetadata);
+						rpcConnection.setSessionId(sessionId);
+						sessionManager.joinRoom(participant, sessionId, request.getId());
+
+					} finally {
+						session.closingLock.readLock().unlock();
+					}
 				} else {
-					participant = sessionManager.newParticipant(sessionId, participantPrivatetId, tokenObj,
-							clientMetadata, location, platform,
-							httpSession.getId().substring(0, Math.min(16, httpSession.getId().length())));
+					log.error(
+							"ERROR: The session {} is in the process of closing while participant {} (privateId) was joining",
+							sessionId, participantPrivatetId);
+					throw new OpenViduException(Code.ROOM_CLOSED_ERROR_CODE,
+							"Unable to join the session. Session " + sessionId + " was in the process of closing");
 				}
-
-				rpcConnection.setSessionId(sessionId);
-				sessionManager.joinRoom(participant, sessionId, request.getId());
-
 			} else {
 				log.error("ERROR: Metadata format set in client-side is incorrect");
-				throw new OpenViduException(Code.USER_METADATA_FORMAT_INVALID_ERROR_CODE,
-						"Unable to join room. The metadata received from the client-side has an invalid format");
+				throw new OpenViduException(Code.USER_METADATA_FORMAT_INVALID_ERROR_CODE, "Unable to join session "
+						+ sessionId + ". The metadata received from the client-side has an invalid format");
 			}
 		} else {
-			log.error("ERROR: sessionId or token not valid");
+			log.error("ERROR: token not valid");
 			throw new OpenViduException(Code.USER_UNAUTHORIZED_ERROR_CODE,
-					"Unable to join room. The user is not authorized");
+					"Unable to join session " + sessionId + ". Token " + token + "is not valid");
 		}
 	}
 
@@ -309,11 +333,23 @@ public class RpcHandler extends DefaultJsonRpcHandler<JsonObject> {
 			return;
 		}
 
-		String senderName = getStringParam(request, ProtocolElements.RECEIVEVIDEO_SENDER_PARAM);
-		senderName = senderName.substring(0, senderName.indexOf("_"));
+		String senderPublicId = getStringParam(request, ProtocolElements.RECEIVEVIDEO_SENDER_PARAM);
+
+		// Parse sender public id from stream id
+		if (senderPublicId.startsWith(IdentifierPrefixes.STREAM_ID + "IPC_")
+				&& senderPublicId.contains(IdentifierPrefixes.IPCAM_ID)) {
+			// If IPCAM
+			senderPublicId = senderPublicId.substring(senderPublicId.indexOf("_" + IdentifierPrefixes.IPCAM_ID) + 1,
+					senderPublicId.length());
+		} else {
+			// Not IPCAM
+			senderPublicId = senderPublicId.substring(
+					senderPublicId.lastIndexOf(IdentifierPrefixes.PARTICIPANT_PUBLIC_ID), senderPublicId.length());
+		}
+
 		String sdpOffer = getStringParam(request, ProtocolElements.RECEIVEVIDEO_SDPOFFER_PARAM);
 
-		sessionManager.subscribe(participant, senderName, sdpOffer, request.getId());
+		sessionManager.subscribe(participant, senderPublicId, sdpOffer, request.getId());
 	}
 
 	private void unsubscribeFromVideo(RpcConnection rpcConnection, Request<JsonObject> request) {
@@ -441,7 +477,7 @@ public class RpcHandler extends DefaultJsonRpcHandler<JsonObject> {
 				&& participant.getToken().getKurentoTokenOptions().isFilterAllowed(filterType))) {
 			JsonObject filterOptions;
 			try {
-				filterOptions = new JsonParser().parse(getStringParam(request, ProtocolElements.FILTER_OPTIONS_PARAM))
+				filterOptions = JsonParser.parseString(getStringParam(request, ProtocolElements.FILTER_OPTIONS_PARAM))
 						.getAsJsonObject();
 			} catch (JsonSyntaxException e) {
 				throw new OpenViduException(Code.FILTER_NOT_APPLIED_ERROR_CODE,
@@ -489,7 +525,7 @@ public class RpcHandler extends DefaultJsonRpcHandler<JsonObject> {
 		}
 		String streamId = getStringParam(request, ProtocolElements.FILTER_STREAMID_PARAM);
 		String filterMethod = getStringParam(request, ProtocolElements.FILTER_METHOD_PARAM);
-		JsonObject filterParams = new JsonParser().parse(getStringParam(request, ProtocolElements.FILTER_PARAMS_PARAM))
+		JsonObject filterParams = JsonParser.parseString(getStringParam(request, ProtocolElements.FILTER_PARAMS_PARAM))
 				.getAsJsonObject();
 		boolean isModerator = this.sessionManager.isModeratorInSession(rpcConnection.getSessionId(), participant);
 
@@ -651,7 +687,8 @@ public class RpcHandler extends DefaultJsonRpcHandler<JsonObject> {
 
 	@Override
 	public void handleUncaughtException(Session rpcSession, Exception exception) {
-		log.error("Uncaught exception for WebSocket session: {} - Exception: {}", rpcSession != null ? rpcSession.getSessionId() : "RpcSession NULL", exception);
+		log.error("Uncaught exception for WebSocket session: {} - Exception: {}",
+				rpcSession != null ? rpcSession.getSessionId() : "RpcSession NULL", exception);
 	}
 
 	@Override

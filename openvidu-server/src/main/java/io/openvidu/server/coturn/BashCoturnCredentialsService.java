@@ -1,5 +1,5 @@
 /*
- * (C) Copyright 2017-2019 OpenVidu (https://openvidu.io/)
+ * (C) Copyright 2017-2020 OpenVidu (https://openvidu.io)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -45,6 +45,7 @@ public class BashCoturnCredentialsService extends CoturnCredentialsService {
 				log.warn("Redis DB is not accesible with connection string " + this.coturnDatabaseString);
 				log.error("No COTURN server will be automatically configured for clients");
 			} else {
+				log.info("COTURN IP: " + this.openviduConfig.getCoturnIp());
 				log.info("COTURN Redis DB accessible with string " + this.coturnDatabaseString);
 				log.info("Cleaning COTURN DB...");
 				if (response.contains("log file opened")) {

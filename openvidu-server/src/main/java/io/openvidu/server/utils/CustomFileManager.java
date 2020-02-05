@@ -1,5 +1,5 @@
 /*
- * (C) Copyright 2017-2019 OpenVidu (https://openvidu.io/)
+ * (C) Copyright 2017-2020 OpenVidu (https://openvidu.io)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,6 +40,15 @@ public class CustomFileManager {
 			log.error("Couldn't create file {}. Error: {}", filePath, e.getMessage());
 			return false;
 		}
+	}
+
+	public boolean createAndWriteFileWithFolders(String filePath, String text) {
+		File f = new File(filePath);
+		if (!f.exists()) {
+			// This doesn't fail if no permissions
+			f.getParentFile().mkdirs();
+		}
+		return this.createAndWriteFile(filePath, text);
 	}
 
 	public boolean overwriteFile(String filePath, String text) {

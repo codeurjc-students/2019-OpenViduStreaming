@@ -68,10 +68,16 @@
 
 	<dependencies>
 		<dependency>
-			<groupId>io.github.bonigarcia</groupId>
-			<artifactId>selenium-jupiter</artifactId>
-			<version>${version.selenium.jupiter}</version>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-test</artifactId>
+			<version>${version.spring-boot}</version>
 			<scope>test</scope>
+			<exclusions>
+				<exclusion>
+					<groupId>org.skyscreamer</groupId>
+					<artifactId>jsonassert</artifactId>
+				</exclusion>
+			</exclusions>
 		</dependency>
 		<dependency>
 			<groupId>io.github.bonigarcia</groupId>
@@ -79,7 +85,6 @@
 			<version>${version.webdrivermanager}</version>
 			<scope>test</scope>
 		</dependency>
-
 		<dependency>
 			<groupId>org.seleniumhq.selenium</groupId>
 			<artifactId>selenium-java</artifactId>
@@ -111,34 +116,9 @@
 			<scope>test</scope>
 		</dependency>
 		<dependency>
-			<groupId>org.junit.platform</groupId>
-			<artifactId>junit-platform-runner</artifactId>
-			<version>${version.junit.platform}</version>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.junit.jupiter</groupId>
-			<artifactId>junit-jupiter</artifactId>
-			<version>${version.junit.jupiter}</version>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>com.googlecode.json-simple</groupId>
-			<artifactId>json-simple</artifactId>
-			<version>${version.json-simple}</version>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>xml-apis</groupId>
-			<artifactId>xml-apis</artifactId>
-			<version>2.0.2</version>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.jcodec</groupId>
-			<artifactId>jcodec</artifactId>
-			<version>0.2.3</version>
-			<scope>test</scope>
+			<groupId>com.google.code.gson</groupId>
+			<artifactId>gson</artifactId>
+			<version>${version.gson}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.jcodec</groupId>
@@ -149,7 +129,7 @@
 		<dependency>
 			<groupId>com.mashape.unirest</groupId>
 			<artifactId>unirest-java</artifactId>
-			<version>1.4.9</version>
+			<version>${version.unirest}</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
@@ -163,11 +143,6 @@
 			<artifactId>openvidu-java-client</artifactId>
 			<version>${version.openvidu.java.client}</version>
 			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-web</artifactId>
-			<version>${version.spring-boot}</version>
 		</dependency>
 	</dependencies>
 

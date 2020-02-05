@@ -1,5 +1,5 @@
 /*
- * (C) Copyright 2017-2019 OpenVidu (https://openvidu.io/)
+ * (C) Copyright 2017-2020 OpenVidu (https://openvidu.io)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -61,6 +61,8 @@ import io.openvidu.server.rpc.RpcNotificationService;
 import io.openvidu.server.utils.CommandExecutor;
 import io.openvidu.server.utils.GeoLocationByIp;
 import io.openvidu.server.utils.GeoLocationByIpDummy;
+import io.openvidu.server.utils.MediaNodeStatusManager;
+import io.openvidu.server.utils.MediaNodeStatusManagerDummy;
 import io.openvidu.server.utils.QuarantineKiller;
 import io.openvidu.server.utils.QuarantineKillerDummy;
 import io.openvidu.server.webhook.CDRLoggerWebhook;
@@ -99,11 +101,16 @@ public class OpenViduServer implements JsonRpcConfigurer {
 	public CallDetailRecord cdr(OpenviduConfig openviduConfig) {
 		List<CDRLogger> loggers = new ArrayList<>();
 		if (openviduConfig.isCdrEnabled()) {
-			log.info("OpenVidu CDR is enabled");
+			log.info("OpenVidu CDR service is enabled");
 			loggers.add(new CDRLoggerFile());
+		} else {
+			log.info("OpenVidu CDR service is disabled");
 		}
 		if (openviduConfig.isWebhookEnabled()) {
+			log.info("OpenVidu Webhook service is enabled");
 			loggers.add(new CDRLoggerWebhook(openviduConfig));
+		} else {
+			log.info("OpenVidu Webhook service is disabled");
 		}
 		return new CallDetailRecord(loggers);
 	}
@@ -184,6 +191,12 @@ public class OpenViduServer implements JsonRpcConfigurer {
 	@ConditionalOnMissingBean
 	public QuarantineKiller quarantineKiller() {
 		return new QuarantineKillerDummy();
+	}
+
+	@Bean
+	@ConditionalOnMissingBean
+	public MediaNodeStatusManager mediaNodeStatusManager() {
+		return new MediaNodeStatusManagerDummy();
 	}
 
 	@Override

@@ -1,5 +1,5 @@
 /*
- * (C) Copyright 2017-2019 OpenVidu (https://openvidu.io/)
+ * (C) Copyright 2017-2020 OpenVidu (https://openvidu.io)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import com.google.gson.JsonObject;
 import io.openvidu.server.core.EndReason;
 import io.openvidu.server.core.MediaOptions;
 import io.openvidu.server.core.Participant;
+import io.openvidu.server.kurento.core.KurentoMediaOptions;
 
 public class CDREventWebrtcConnection extends CDREventEnd implements Comparable<CDREventWebrtcConnection> {
 
@@ -63,6 +64,14 @@ public class CDREventWebrtcConnection extends CDREventEnd implements Comparable<
 			json.addProperty("receivingFrom", this.receivingFrom);
 		} else {
 			json.addProperty("connection", "OUTBOUND");
+			if (mediaOptions instanceof KurentoMediaOptions) {
+				KurentoMediaOptions kMediaOptions = (KurentoMediaOptions)mediaOptions;
+				if (kMediaOptions.rtspUri != null) {
+					json.addProperty("rtspUri", kMediaOptions.rtspUri);
+					json.addProperty("adaptativeBitrate", kMediaOptions.adaptativeBitrate);
+					json.addProperty("onlyPlayWithSubscribers", kMediaOptions.onlyPlayWithSubscribers);
+				}
+			}
 		}
 		if (this.mediaOptions.hasVideo()) {
 			json.addProperty("videoSource", this.mediaOptions.getTypeOfVideo());

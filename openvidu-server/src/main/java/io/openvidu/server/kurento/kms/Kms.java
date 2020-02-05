@@ -1,5 +1,5 @@
 /*
- * (C) Copyright 2017-2019 OpenVidu (https://openvidu.io/)
+ * (C) Copyright 2017-2020 OpenVidu (https://openvidu.io)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.kurento.client.KurentoClient;
@@ -51,10 +52,9 @@ public class Kms {
 
 	private static final Logger log = LoggerFactory.getLogger(Kms.class);
 
-	private String id;
+	private String id; // Dynamic ID
 	private String uri;
 	private String ip;
-	private boolean quarantined;
 	private KurentoClient client;
 	private LoadManager loadManager;
 
@@ -63,11 +63,11 @@ public class Kms {
 	private AtomicLong timeOfKurentoClientDisconnection = new AtomicLong(0);
 
 	private Map<String, KurentoSession> kurentoSessions = new ConcurrentHashMap<>();
+	private AtomicInteger activeRecordings = new AtomicInteger(0);
 
 	public Kms(KmsProperties props, LoadManager loadManager) {
 		this.id = props.getId();
 		this.uri = props.getUri();
-		this.quarantined = false;
 
 		String parsedUri = uri.replaceAll("^ws://", "http://").replaceAll("^wss://", "https://");
 		URL url = null;
@@ -95,14 +95,6 @@ public class Kms {
 
 	public String getIp() {
 		return ip;
-	}
-
-	public synchronized boolean isQuarantined() {
-		return this.quarantined;
-	}
-
-	public synchronized void setQuarantined(boolean quarantined) {
-		this.quarantined = quarantined;
 	}
 
 	public KurentoClient getKurentoClient() {
@@ -153,12 +145,16 @@ public class Kms {
 		this.kurentoSessions.remove(sessionId);
 	}
 
+	public AtomicInteger getActiveRecordings() {
+		return this.activeRecordings;
+	}
+
 	public JsonObject toJson() {
 		JsonObject json = new JsonObject();
 		json.addProperty("id", this.id);
-		json.addProperty("uri", this.uri);
 		json.addProperty("ip", this.ip);
-		json.addProperty("quarantined", this.quarantined);
+		json.addProperty("uri", this.uri);
+
 		final boolean connected = this.isKurentoClientConnected();
 		json.addProperty("connected", connected);
 		json.addProperty("connectionTime", this.getTimeOfKurentoClientConnection());

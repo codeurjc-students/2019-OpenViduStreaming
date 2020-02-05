@@ -1,5 +1,5 @@
 /*
- * (C) Copyright 2017-2019 OpenVidu (https://openvidu.io/)
+ * (C) Copyright 2017-2020 OpenVidu (https://openvidu.io)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,9 +42,9 @@ public class SubscriberEndpoint extends MediaEndpoint {
 
 	private String publisherStreamId;
 
-	public SubscriberEndpoint(boolean web, KurentoParticipant owner, String endpointName, MediaPipeline pipeline,
-			OpenviduConfig openviduConfig) {
-		super(web, owner, endpointName, pipeline, openviduConfig, log);
+	public SubscriberEndpoint(EndpointType endpointType, KurentoParticipant owner, String endpointName,
+			MediaPipeline pipeline, OpenviduConfig openviduConfig) {
+		super(endpointType, owner, endpointName, pipeline, openviduConfig, log);
 	}
 
 	public synchronized String subscribe(String sdpOffer, PublisherEndpoint publisher) {

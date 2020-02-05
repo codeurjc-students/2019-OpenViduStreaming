@@ -1,5 +1,5 @@
 /*
- * (C) Copyright 2017-2019 OpenVidu (https://openvidu.io/)
+ * (C) Copyright 2017-2020 OpenVidu (https://openvidu.io)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -46,6 +46,7 @@ import io.openvidu.client.OpenViduException;
 import io.openvidu.client.OpenViduException.Code;
 import io.openvidu.server.config.OpenviduConfig;
 import io.openvidu.server.core.MediaOptions;
+import io.openvidu.server.kurento.core.KurentoMediaOptions;
 import io.openvidu.server.kurento.core.KurentoParticipant;
 import io.openvidu.server.utils.JsonUtils;
 
@@ -73,9 +74,11 @@ public class PublisherEndpoint extends MediaEndpoint {
 
 	private Map<String, ListenerSubscription> elementsErrorSubscriptions = new HashMap<String, ListenerSubscription>();
 
-	public PublisherEndpoint(boolean web, KurentoParticipant owner, String endpointName, MediaPipeline pipeline,
-			OpenviduConfig openviduConfig) {
-		super(web, owner, endpointName, pipeline, openviduConfig, log);
+	public int numberOfSubscribers = 0;
+
+	public PublisherEndpoint(EndpointType endpointType, KurentoParticipant owner, String endpointName,
+			MediaPipeline pipeline, OpenviduConfig openviduConfig) {
+		super(endpointType, owner, endpointName, pipeline, openviduConfig, log);
 	}
 
 	@Override
@@ -172,15 +175,10 @@ public class PublisherEndpoint extends MediaEndpoint {
 	 * @return the SDP response (the answer if processing an offer SDP, otherwise is
 	 *         the updated offer generated previously by this endpoint)
 	 */
-	public synchronized String publish(SdpType sdpType, String sdpString, boolean doLoopback,
-			MediaElement loopbackAlternativeSrc, MediaType loopbackConnectionType) {
+	public synchronized String publish(SdpType sdpType, String sdpString, boolean doLoopback) {
 		registerOnIceCandidateEventListener(this.getOwner().getParticipantPublicId());
 		if (doLoopback) {
-			if (loopbackAlternativeSrc == null) {
-				connect(this.getEndpoint(), loopbackConnectionType);
-			} else {
-				connectAltLoopbackSrc(loopbackAlternativeSrc, loopbackConnectionType);
-			}
+			connect(this.getEndpoint(), null);
 		} else {
 			innerConnect();
 		}
@@ -200,15 +198,12 @@ public class PublisherEndpoint extends MediaEndpoint {
 		return sdpResponse;
 	}
 
-	public synchronized String preparePublishConnection() {
-		return generateOffer();
-	}
-
 	public synchronized void connect(MediaElement sink) {
 		if (!connected) {
 			innerConnect();
 		}
 		internalSinkConnect(passThru, sink);
+		this.enableIpCameraIfNecessary();
 	}
 
 	public synchronized void connect(MediaElement sink, MediaType type) {
@@ -216,14 +211,24 @@ public class PublisherEndpoint extends MediaEndpoint {
 			innerConnect();
 		}
 		internalSinkConnect(passThru, sink, type);
+		this.enableIpCameraIfNecessary();
+	}
+
+	private void enableIpCameraIfNecessary() {
+		numberOfSubscribers++;
+		if (this.isPlayerEndpoint() && ((KurentoMediaOptions) this.mediaOptions).onlyPlayWithSubscribers
+				&& numberOfSubscribers == 1) {
+			try {
+				this.getPlayerEndpoint().play();
+				log.info("IP Camera stream {} feed is now enabled", streamId);
+			} catch (Exception e) {
+				log.info("Error while enabling feed for IP camera {}: {}", streamId, e.getMessage());
+			}
+		}
 	}
 
 	public synchronized void disconnectFrom(MediaElement sink) {
 		internalSinkDisconnect(passThru, sink);
-	}
-
-	public synchronized void disconnectFrom(MediaElement sink, MediaType type) {
-		internalSinkDisconnect(passThru, sink, type);
 	}
 
 	/**
@@ -415,13 +420,6 @@ public class PublisherEndpoint extends MediaEndpoint {
 		return elementIds.get(idx - 1);
 	}
 
-	private void connectAltLoopbackSrc(MediaElement loopbackAlternativeSrc, MediaType loopbackConnectionType) {
-		if (!connected) {
-			innerConnect();
-		}
-		internalSinkConnect(loopbackAlternativeSrc, this.getEndpoint(), loopbackConnectionType);
-	}
-
 	private void innerConnect() {
 		if (this.getEndpoint() == null) {
 			throw new OpenViduException(Code.MEDIA_ENDPOINT_ERROR_CODE,
@@ -549,6 +547,9 @@ public class PublisherEndpoint extends MediaEndpoint {
 	public JsonObject toJson() {
 		JsonObject json = super.toJson();
 		json.addProperty("streamId", this.getStreamId());
+		if (this.isPlayerEndpoint()) {
+			json.addProperty("rtspUri", ((KurentoMediaOptions) this.mediaOptions).rtspUri);
+		}
 		json.add("mediaOptions", this.mediaOptions.toJson());
 		return json;
 	}
