@@ -21,8 +21,8 @@ import { Session } from '../../OpenVidu/Session';
 
 /**
  * Defines the following events:
- * - `recordingStarted`: dispatched by [[Session]]
- * - `recordingStopped`: dispatched by [[Session]]
+ * - `recordingStarted`: dispatched by [[Session]] after the session has started being recorded
+ * - `recordingStopped`: dispatched by [[Session]] after the session has stopped being recorded
  */
 export class RecordingEvent extends Event {
 
@@ -45,7 +45,7 @@ export class RecordingEvent extends Event {
      * For 'recordingStopped' event:
      * - "recordingStoppedByServer": the recording has been gracefully stopped by the application
      * - "sessionClosedByServer": the Session has been closed by the application
-     * - "automaticStop": see [Automatic stop of recordings](https://openvidu.io/docs/advanced-features/recording/#automatic-stop-of-recordings)
+     * - "automaticStop": see [Automatic stop of recordings](/en/stable/advanced-features/recording/#automatic-stop-of-recordings)
      * - "mediaServerDisconnect": OpenVidu Media Node has crashed or lost its connection. A new Media Node instance is active and the recording has been stopped (no media streams are available in the new Media Node)
      *
      * For 'recordingStarted' empty string

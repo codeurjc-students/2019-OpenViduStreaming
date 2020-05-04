@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
 
-	<springProperty scope="context" name="cdrPath" source="openvidu.cdr.path"/>
+	<springProperty scope="context" name="cdrPath" source="OPENVIDU_CDR_PATH" />
 
 	<timestamp key="myTimestamp" timeReference="contextBirth"
 		datePattern="HH-mm-ss" />
@@ -11,11 +11,10 @@
 			<if
 				condition='property("logging.colors").equalsIgnoreCase("true")'>
 				<then>
-					<pattern>%highlight([%p]) %d %magenta([%.15t]) %c \(%M\) - %msg%n
-					</pattern>
+					<pattern>%black(%highlight([%p]) %d{dd MMM HH:mm:ss.SSS} %magenta([%.15t]) \(%file:%line\) - %msg%n)</pattern>
 				</then>
 				<else>
-					<pattern>[%p] %d [%.15t] %c \(%M\) - %msg%n
+					<pattern>[%p] %d [%.15t] %c - %msg%n
 					</pattern>
 				</else>
 			</if>
@@ -33,12 +32,12 @@
 		name="io.openvidu.server.kurento.core.KurentoSessionManager">
 		<appender-ref ref="CUSTOMCLASS" />
 	</logger>-->
-	
+
 	<root>
 		<level value="INFO" />
 		<appender-ref ref="STDOUT" />
 	</root>
-	<if condition='property("openvidu.cdr").equalsIgnoreCase("true")'>
+	<if condition='property("OPENVIDU_CDR").equalsIgnoreCase("true")'>
 		<then>
 			<appender name="CDR"
 				class="ch.qos.logback.core.rolling.RollingFileAppender">
@@ -49,7 +48,8 @@
 					<MaxHistory>30</MaxHistory>
 					<TotalSizeCap>20GB</TotalSizeCap>
 				</rollingPolicy>
-				<encoder>
+				<encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+					<charset>UTF-8</charset>
 					<pattern>%m\n</pattern>
 				</encoder>
 			</appender>

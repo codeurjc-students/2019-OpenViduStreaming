@@ -19,12 +19,17 @@ import { Event } from './Event';
 import { Publisher } from '../../OpenVidu/Publisher';
 import { Session } from '../../OpenVidu/Session';
 import { Stream } from '../../OpenVidu/Stream';
+import { OpenViduLogger } from '../Logger/OpenViduLogger';
 
+/**
+ * @hidden
+ */
+const logger: OpenViduLogger = OpenViduLogger.getInstance();
 
 /**
  * Defines the following events:
- * - `streamCreated`: dispatched by [[Session]] and [[Publisher]]
- * - `streamDestroyed`: dispatched by [[Session]] and [[Publisher]]
+ * - `streamCreated`: dispatched by [[Session]] and [[Publisher]] after some user has started publishing to the session
+ * - `streamDestroyed`: dispatched by [[Session]] and [[Publisher]] after some user has stopped publishing to the session
  */
 export class StreamEvent extends Event {
 
@@ -66,11 +71,11 @@ export class StreamEvent extends Event {
 
             if (this.target instanceof Session) {
                 // Remote Stream
-                console.info("Calling default behavior upon '" + this.type + "' event dispatched by 'Session'");
+                logger.info("Calling default behavior upon '" + this.type + "' event dispatched by 'Session'");
                 this.stream.disposeWebRtcPeer();
             } else if (this.target instanceof Publisher) {
                 // Local Stream
-                console.info("Calling default behavior upon '" + this.type + "' event dispatched by 'Publisher'");
+                logger.info("Calling default behavior upon '" + this.type + "' event dispatched by 'Publisher'");
                 clearInterval((<Publisher>this.target).screenShareResizeInterval);
                 this.stream.isLocalStreamReadyToPublish = false;
 

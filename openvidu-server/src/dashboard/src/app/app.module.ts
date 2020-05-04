@@ -1,9 +1,7 @@
 import { NgModule } from '@angular/core';
 import { FlexLayoutModule } from '@angular/flex-layout';
 import { FormsModule } from '@angular/forms';
-import { HttpModule } from '@angular/http';
 import { BrowserModule } from '@angular/platform-browser';
-import 'hammerjs';
 import { AppComponent } from './app.component';
 import { AppMaterialModule } from './app.material.module';
 import { routing } from './app.routing';
@@ -17,6 +15,7 @@ import { OpenViduVideoComponent } from './components/layouts/ov-video.component'
 import { SessionDetailsComponent } from './components/session-details/session-details.component';
 import { InfoService } from './services/info.service';
 import { RestService } from './services/rest.service';
+import { HttpClientModule } from '@angular/common/http';
 
 @NgModule({
   declarations: [
@@ -33,13 +32,10 @@ import { RestService } from './services/rest.service';
   imports: [
     BrowserModule,
     FormsModule,
-    HttpModule,
+    HttpClientModule,
     routing,
     AppMaterialModule,
     FlexLayoutModule
-  ],
-  entryComponents: [
-    CredentialsDialogComponent
   ],
   providers: [InfoService, RestService],
   bootstrap: [AppComponent]

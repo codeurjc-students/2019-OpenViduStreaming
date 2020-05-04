@@ -37,7 +37,7 @@ public class Participant {
 	protected EndpointType endpointType; // Type of participant (web participant, IP cam participant...)
 
 	protected boolean streaming = false;
-	protected volatile boolean closed;
+	protected volatile boolean closed = false;
 
 	private final String METADATA_SEPARATOR = "%/%";
 
@@ -163,6 +163,11 @@ public class Participant {
 		return fullMetadata;
 	}
 
+	public void deleteIpcamProperties() {
+		this.clientMetadata = "";
+		this.token.setToken(null);
+	}
+
 	@Override
 	public int hashCode() {
 		final int prime = 31;
@@ -225,7 +230,9 @@ public class Participant {
 		json.addProperty("createdAt", this.createdAt);
 		json.addProperty("location", this.location != null ? this.location.toString() : "unknown");
 		json.addProperty("platform", this.platform);
-		json.addProperty("token", this.token.getToken());
+		if (this.token.getToken() != null) {
+			json.addProperty("token", this.token.getToken());
+		}
 		json.addProperty("role", this.token.getRole().name());
 		json.addProperty("serverData", this.serverMetadata);
 		json.addProperty("clientData", this.clientMetadata);

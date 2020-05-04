@@ -8,9 +8,12 @@ assignees: ''
 ---
 
 <!--
+IMPORTANT!!! IMPORTANT!!! IMPORTANT!!! IMPORTANT!!!
+YOU SHOULD NEVER DELETE THE CONTENT OF THIS TEMPLATE WHEN OPENING AN ISSUE. IF YOUR QUESTION DOES NOT FIT THE TEMPLATE THEN IT MOST PROBABLY BELONGS TO OPENVIDU FORUM (https://openvidu.discourse.group/)
+
 Hi! First of all, welcome to OpenVidu issue tracker. Please, carefully read the two points below before opening a new issue:
 
-1. Is your question really a bug? In other words: did you actually get an unexpected behavior from OpenVidu platform? If you are not sure about the answer or you just want support for a particular use case, you can post a new question in our official Google Group forum (https://groups.google.com/forum/#!forum/openvidu). OpenVidu community or a team's member will reply ASAP.
+1. Is your question really a bug? In other words: did you actually get an unexpected behavior from OpenVidu platform? If you are not sure about the answer or you just want support for a particular use case, you can post a new question in our official Discourse Forum (https://openvidu.discourse.group/). OpenVidu community or a team's member will reply ASAP.
 
 2. If your question is undoubtedly a bug, check that there's no other issue (opened or closed) talking about it. Your question may have already been answered! If you cannot find anything useful, please fill the report below.
 -->
@@ -36,7 +39,7 @@ This is an EXTREMELY IMPORTANT STEP. If we are able to replicate the error in an
 **OpenVidu deployment info**
 How is your OpenVidu Server instance deployed when you get the bug. A couple of possible examples are listed below:
 - Docker container as explained in OpenVidu tutorials, run with command `docker run ...` on macOS Catalina 10.15.1
-- AWS deployment as explained in OpenVidu Docs (https://openvidu.io/docs/deployment/deploying-aws/)
+- AWS deployment as explained in OpenVidu Docs (https://docs.openvidu.io/en/stable/deployment/deploying-aws/)
 
 > **IMPORTANT NOTE**: please, if you think the bug might be related to OpenVidu Server side, specify here if you are also getting the error by using OpenVidu Server Demos instance. This instance is publicly available (use it only for this test, because it is not secure!!!): **URL**: `https://demos.openvidu.io:4443`, **SECRET**: `MY_SECRET`
 

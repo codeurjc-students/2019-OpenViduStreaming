@@ -46,7 +46,7 @@ import io.openvidu.server.kurento.kms.Kms;
  */
 public class KurentoSession extends Session {
 
-	private final static Logger log = LoggerFactory.getLogger(Session.class);
+	private final static Logger log = LoggerFactory.getLogger(KurentoSession.class);
 	public static final int ASYNC_LATCH_TIMEOUT = 30;
 
 	private MediaPipeline pipeline;
@@ -89,15 +89,6 @@ public class KurentoSession extends Session {
 
 	public void newPublisher(Participant participant) {
 		registerPublisher();
-
-		// pre-load endpoints to recv video from the new publisher
-		for (Participant p : participants.values()) {
-			if (participant.equals(p)) {
-				continue;
-			}
-			((KurentoParticipant) p).getNewOrExistingSubscriber(participant.getParticipantPublicId());
-		}
-
 		log.debug("SESSION {}: Virtually subscribed other participants {} to new publisher {}", sessionId,
 				participants.values(), participant.getParticipantPublicId());
 	}
@@ -108,7 +99,7 @@ public class KurentoSession extends Session {
 			if (participant.equals(subscriber)) {
 				continue;
 			}
-			((KurentoParticipant) subscriber).cancelReceivingMedia((KurentoParticipant) participant, reason);
+			((KurentoParticipant) subscriber).cancelReceivingMedia((KurentoParticipant) participant, reason, false);
 		}
 
 		log.debug("SESSION {}: Unsubscribed other participants {} from the publisher {}", sessionId,
@@ -187,7 +178,7 @@ public class KurentoSession extends Session {
 		log.debug("SESSION {}: Cancel receiving media from participant '{}' for other participant", this.sessionId,
 				participant.getParticipantPublicId());
 		for (Participant other : participants.values()) {
-			((KurentoParticipant) other).cancelReceivingMedia(removedParticipant, reason);
+			((KurentoParticipant) other).cancelReceivingMedia(removedParticipant, reason, false);
 		}
 	}
 
@@ -329,8 +320,9 @@ public class KurentoSession extends Session {
 				}
 				getParticipants().forEach(p -> {
 					if (!OpenViduRole.SUBSCRIBER.equals(p.getToken().getRole())) {
-						((KurentoParticipant) p)
-								.resetPublisherEndpoint(mediaOptionsMap.get(p.getParticipantPublicId()));
+
+						((KurentoParticipant) p).resetPublisherEndpoint(mediaOptionsMap.get(p.getParticipantPublicId()),
+								null);
 					}
 				});
 				log.info(

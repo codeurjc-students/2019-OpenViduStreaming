@@ -26,6 +26,8 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.kurento.client.Continuation;
 import org.kurento.client.GenericMediaElement;
@@ -76,16 +78,29 @@ public class PublisherEndpoint extends MediaEndpoint {
 
 	public int numberOfSubscribers = 0;
 
+	/**
+	 * This lock protects the following method with read lock:
+	 * KurentoParticipant#receiveMediaFrom. It uses tryLock, immediately failing if
+	 * written locked
+	 * 
+	 * Lock is written-locked upon KurentoParticipant#releasePublisherEndpoint and
+	 * KurentoParticipant#cancelReceivingMedia
+	 */
+	public ReadWriteLock closingLock = new ReentrantReadWriteLock();
+
 	public PublisherEndpoint(EndpointType endpointType, KurentoParticipant owner, String endpointName,
-			MediaPipeline pipeline, OpenviduConfig openviduConfig) {
+			MediaPipeline pipeline, OpenviduConfig openviduConfig, PassThrough passThru) {
 		super(endpointType, owner, endpointName, pipeline, openviduConfig, log);
+		this.passThru = passThru;
 	}
 
 	@Override
 	protected void internalEndpointInitialization(final CountDownLatch endpointLatch) {
 		super.internalEndpointInitialization(endpointLatch);
-		passThru = new PassThrough.Builder(getPipeline()).build();
-		passThruSubscription = registerElemErrListener(passThru);
+		if (this.passThru == null) {
+			passThru = new PassThrough.Builder(getPipeline()).build();
+			passThruSubscription = registerElemErrListener(passThru);
+		}
 	}
 
 	@Override
@@ -402,6 +417,11 @@ public class PublisherEndpoint extends MediaEndpoint {
 			internalSinkConnect(this.getEndpoint(), sink, MediaType.VIDEO);
 			break;
 		}
+	}
+
+	public synchronized PassThrough disconnectFromPassThrough() {
+		this.internalSinkDisconnect(this.getWebEndpoint(), this.passThru);
+		return this.passThru;
 	}
 
 	private String getNext(String uid) {

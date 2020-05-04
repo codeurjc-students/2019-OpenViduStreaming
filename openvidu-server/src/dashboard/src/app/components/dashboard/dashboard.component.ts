@@ -1,5 +1,5 @@
 import { Component, OnInit, ViewChild, ElementRef, HostListener, OnDestroy } from '@angular/core';
-import { MatDialog, MatDialogRef } from '@angular/material';
+import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { Subscription } from 'rxjs';
 
 import { InfoService } from '../../services/info.service';
@@ -17,7 +17,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   websocket: WebSocket;
 
-  @ViewChild('scrollMe', { static: false }) private myScrollContainer: ElementRef;
+  @ViewChild('scrollMe') private myScrollContainer: ElementRef;
   lockScroll = false;
 
   infoSubscription: Subscription;
@@ -103,20 +103,19 @@ export class DashboardComponent implements OnInit, OnDestroy {
     dialogRef = this.dialog.open(CredentialsDialogComponent);
     dialogRef.componentInstance.myReference = dialogRef;
 
-    dialogRef.afterClosed().subscribe(secret => {
+    dialogRef.afterClosed().subscribe(async secret => {
       if (secret) {
-        this.restService.getOpenViduToken(secret)
-          .then((token => {
-            this.connectToSession(token);
-          }))
-          .catch(error => {
-            if (error === 401) { // User unauthorized error. OpenVidu security is active
-              this.testVideo();
-            } else {
-              console.error(error);
-              this.msgChain.push('Error connecting to session: ' + error);
-            }
-          });
+        try {
+          const token = await this.restService.getToken(secret);
+          this.connectToSession(token);
+        } catch (error) {
+          if (error.status === 401) { // User unauthorized error. OpenVidu security is active
+            this.testVideo();
+          } else {
+            console.error(error.error);
+            this.msgChain.push('Error connecting to session: [' + error.status + '] ' + error.message);
+          }
+        }
       }
     });
   }

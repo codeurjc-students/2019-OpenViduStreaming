@@ -162,6 +162,9 @@ public class RpcHandler extends DefaultJsonRpcHandler<JsonObject> {
 		case ProtocolElements.REMOVEFILTEREVENTLISTENER_METHOD:
 			removeFilterEventListener(rpcConnection, request);
 			break;
+		case ProtocolElements.RECONNECTSTREAM_METHOD:
+			reconnectStream(rpcConnection, request);
+			break;
 		default:
 			log.error("Unrecognized request {}", request);
 			break;
@@ -254,11 +257,11 @@ public class RpcHandler extends DefaultJsonRpcHandler<JsonObject> {
 
 				// While closing a session users can't join
 				if (session.closingLock.readLock().tryLock()) {
-					if (session.isClosed()) {
-						throw new OpenViduException(Code.ROOM_CLOSED_ERROR_CODE,
-								"Unable to join the session. Session " + sessionId + " is closed");
-					}
 					try {
+						if (session.isClosed()) {
+							throw new OpenViduException(Code.ROOM_CLOSED_ERROR_CODE,
+									"Unable to join the session. Session " + sessionId + " is closed");
+						}
 						Participant participant;
 						if (generateRecorderParticipant) {
 							participant = sessionManager.newRecorderParticipant(sessionId, participantPrivatetId,
@@ -376,6 +379,10 @@ public class RpcHandler extends DefaultJsonRpcHandler<JsonObject> {
 		String candidate = getStringParam(request, ProtocolElements.ONICECANDIDATE_CANDIDATE_PARAM);
 		String sdpMid = getStringParam(request, ProtocolElements.ONICECANDIDATE_SDPMIDPARAM);
 		int sdpMLineIndex = getIntParam(request, ProtocolElements.ONICECANDIDATE_SDPMLINEINDEX_PARAM);
+
+		log.info(
+				"New candidate received from participant {}: {connectionId: \"{}\", sdpMid: {}, sdpMLineIndex: {}, candidate: \"{}\"}",
+				participant.getParticipantPublicId(), endpointName, sdpMid, sdpMLineIndex, candidate);
 
 		sessionManager.onIceCandidate(participant, endpointName, candidate, sdpMLineIndex, sdpMid, request.getId());
 	}
@@ -602,6 +609,23 @@ public class RpcHandler extends DefaultJsonRpcHandler<JsonObject> {
 		}
 	}
 
+	private void reconnectStream(RpcConnection rpcConnection, Request<JsonObject> request) {
+		Participant participant;
+		try {
+			participant = sanityCheckOfSession(rpcConnection, "reconnectStream");
+		} catch (OpenViduException e) {
+			return;
+		}
+		String streamId = getStringParam(request, ProtocolElements.RECONNECTSTREAM_STREAM_PARAM);
+		String sdpOffer = getStringParam(request, ProtocolElements.RECONNECTSTREAM_SDPOFFER_PARAM);
+		try {
+			sessionManager.reconnectStream(participant, streamId, sdpOffer, request.getId());
+		} catch (OpenViduException e) {
+			this.notificationService.sendErrorResponse(participant.getParticipantPrivateId(), request.getId(),
+					new JsonObject(), e);
+		}
+	}
+
 	public void leaveRoomAfterConnClosed(String participantPrivateId, EndReason reason) {
 		try {
 			sessionManager.evictParticipant(this.sessionManager.getParticipant(participantPrivateId), null, null,
@@ -671,17 +695,24 @@ public class RpcHandler extends DefaultJsonRpcHandler<JsonObject> {
 	}
 
 	@Override
+	public void afterReconnection(Session rpcSession) throws Exception {
+		log.info("After reconnection for WebSocket session: {}", rpcSession.getSessionId());
+	}
+
+	@Override
 	public void handleTransportError(Session rpcSession, Throwable exception) throws Exception {
-		log.error("Transport exception for WebSocket session: {} - Exception: {}", rpcSession.getSessionId(),
-				exception.getMessage());
-		if ("IOException".equals(exception.getClass().getSimpleName())
-				&& "Broken pipe".equals(exception.getCause().getMessage())) {
-			log.warn("Parcipant with private id {} unexpectedly closed the websocket", rpcSession.getSessionId());
-		}
-		if ("EOFException".equals(exception.getClass().getSimpleName())) {
-			// Store WebSocket connection interrupted exception for this web socket to
-			// automatically evict the participant on "afterConnectionClosed" event
-			this.webSocketEOFTransportError.put(rpcSession.getSessionId(), true);
+		if (rpcSession != null) {
+			log.error("Transport exception for WebSocket session: {} - Exception: {}", rpcSession.getSessionId(),
+					exception.getMessage());
+			if ("IOException".equals(exception.getClass().getSimpleName()) && exception.getCause() != null
+					&& "Broken pipe".equals(exception.getCause().getMessage())) {
+				log.warn("Parcipant with private id {} unexpectedly closed the websocket", rpcSession.getSessionId());
+			}
+			if ("EOFException".equals(exception.getClass().getSimpleName())) {
+				// Store WebSocket connection interrupted exception for this web socket to
+				// automatically evict the participant on "afterConnectionClosed" event
+				this.webSocketEOFTransportError.put(rpcSession.getSessionId(), true);
+			}
 		}
 	}
 
